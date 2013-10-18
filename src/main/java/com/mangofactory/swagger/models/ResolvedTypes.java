@@ -1,17 +1,8 @@
 package com.mangofactory.swagger.models;
 
-import com.fasterxml.classmate.MemberResolver;
-import com.fasterxml.classmate.ResolvedType;
-import com.fasterxml.classmate.ResolvedTypeWithMembers;
-import com.fasterxml.classmate.TypeResolver;
-import com.fasterxml.classmate.members.ResolvedMethod;
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Strings;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Ordering;
-import com.google.common.primitives.Ints;
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Lists.transform;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -22,9 +13,22 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.google.common.collect.Iterables.*;
-import static com.google.common.collect.Lists.*;
-import static com.google.common.collect.Lists.transform;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.core.MethodParameter;
+
+import com.fasterxml.classmate.MemberResolver;
+import com.fasterxml.classmate.ResolvedType;
+import com.fasterxml.classmate.ResolvedTypeWithMembers;
+import com.fasterxml.classmate.TypeResolver;
+import com.fasterxml.classmate.members.RawField;
+import com.fasterxml.classmate.members.ResolvedMethod;
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Ordering;
+import com.google.common.primitives.Ints;
 
 public class ResolvedTypes {
     static Pattern getter = Pattern.compile("^get([a-zA-Z].*)");
@@ -96,18 +100,44 @@ public class ResolvedTypes {
         });
     }
 
-    public static List<ResolvedType> methodParameters(TypeResolver typeResolver, final Method methodToResolve) {
+    public static List<ParameterInfo> methodParameters(TypeResolver typeResolver, 
+            final Method methodToResolve, final MethodParameter[] methodParameters, final String [] parameterNames) {
+
+        List<ParameterInfo> resolvedParams = newArrayList();
 
         ResolvedMethod resolvedMethod = getResolvedMethod(typeResolver, methodToResolve);
-        List<ResolvedType> parameters = newArrayList();
+
         if (resolvedMethod != null) {
             for (int index = 0; index < resolvedMethod.getArgumentCount(); index++) {
-                parameters.add(resolvedMethod.getArgumentType(index));
+                ResolvedType type = resolvedMethod.getArgumentType(index);
+                //if (type.isConcrete() && !type.isPrimitive()){
+                if (StringUtils.equals(type.getClass().getName(), "com.vivareal.model.pojo.ListingQuery")){
+
+                    List<RawField> fields = type.getMemberFields();
+
+                    for (RawField field : fields) {                    
+
+                        ParameterInfo paramInfo = new ParameterInfo();
+                        paramInfo.setDefaultParameterName(field.getName());
+                        paramInfo.setMethodParameter(methodParameters[index]);
+                        paramInfo.setParameterType(field.getDeclaringType());
+
+                        resolvedParams.add(paramInfo);
+                    }
+
+                }else{
+                    ParameterInfo paramInfo = new ParameterInfo();
+                    paramInfo.setDefaultParameterName(parameterNames[index]);
+                    paramInfo.setMethodParameter(methodParameters[index]);
+                    paramInfo.setParameterType(type);
+                    resolvedParams.add(paramInfo);
+                }
             }
         }
-        return parameters;
+        return resolvedParams;
 
     }
+
 
     public static ResolvedType methodReturnType(TypeResolver typeResolver, final Method methodToResolve) {
         ResolvedMethod resolvedMethod = getResolvedMethod(typeResolver, methodToResolve);
